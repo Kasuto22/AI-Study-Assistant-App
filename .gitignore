@@ -11,3 +11,13 @@ build/
 # OS Generated Files
 .DS_Store
 Thumbs.db
+
+# Python and AI Service
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+env/
+.pytest_cache/
