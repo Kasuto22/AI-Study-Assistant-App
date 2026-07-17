@@ -13,26 +13,24 @@ datasource db {
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
-  password  String   
+  password  String   // This will store the hashed password
   decks     Deck[]   // A user can have many decks
   createdAt DateTime @default(now())
 }
 
 model Deck {
-  id          String      @id @default(uuid())
-  title       String
-  description String?     // '?' = field optional
-  userId      String
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  flashcards  Flashcard[] // A deck can have many flashcards
-  createdAt   DateTime    @default(now())
+  id        String      @id @default(uuid())
+  title     String
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cards     Flashcard[] // A deck has many flashcards
+  createdAt DateTime    @default(now())
 }
 
 model Flashcard {
   id        String   @id @default(uuid())
-  question  String
-  answer    String
+  front     String
+  back      String
   deckId    String
   deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
 }
