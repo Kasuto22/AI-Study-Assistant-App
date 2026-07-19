@@ -28,9 +28,15 @@ model Deck {
 }
 
 model Flashcard {
-  id        String   @id @default(uuid())
-  front     String
-  back      String
-  deckId    String
-  deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  front       String
+  back        String
+  deckId      String
+  deck        Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  
+  // --- Spaced Repetition Tracking ---
+  nextReview  DateTime @default(now()) // When should they see this next?
+  easeFactor  Float    @default(2.5)   // How easy is this card?
+  interval    Int      @default(0)     // How many days to wait until the next review
+  reviewCount Int      @default(0)     // How many times has the user reviewed this card?
 }
