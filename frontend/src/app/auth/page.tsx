@@ -4,6 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+const contributors = [
+  { name: "Sam", contribution: "Suggested being able to edit the cards" },
+  {
+    name: "Erika",
+    contribution: "Suggested being able to add images or draw on cards",
+  },
+];
+
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -122,8 +130,8 @@ export default function AuthPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-slate-900 p-4 transition-colors duration-300">
-      <div className="w-full max-w-md bg-white dark:bg-slate-800 p-8 rounded-xl shadow-lg border border-gray-100 dark:border-slate-700">
+    <main className="flex min-h-screen relative items-center justify-center bg-gray-50 dark:bg-slate-900 p-4 transition-colors duration-300">
+      <div className="w-full max-w-md bg-white dark:bg-slate-800 p-8 rounded-xl shadow-lg border border-gray-100 dark:border-slate-700 z-10">
         <h2 className="text-2xl font-bold text-center text-gray-800 dark:text-white mb-6">
           {isLogin ? "Welcome Back" : "Create an Account"}
         </h2>
@@ -293,6 +301,25 @@ export default function AuthPage() {
             {isLogin ? "Sign Up" : "Log In"}
           </button>
         </p>
+      </div>
+
+      {/* Expandable Contributors Footer */}
+      <div className="absolute bottom-6 w-full flex justify-center z-0">
+        <details className="text-sm text-gray-500 dark:text-slate-400 group cursor-pointer text-center">
+          <summary className="font-medium hover:text-blue-600 dark:hover:text-blue-400 transition-colors list-none">
+            ✨ Special Thanks & Contributors
+          </summary>
+          <ul className="mt-3 space-y-2 bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-100 dark:border-slate-700 text-left mx-auto inline-block">
+            {contributors.map((c, idx) => (
+              <li key={idx}>
+                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                  {c.name}:
+                </span>{" "}
+                {c.contribution}
+              </li>
+            ))}
+          </ul>
+        </details>
       </div>
     </main>
   );
