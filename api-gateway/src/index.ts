@@ -156,15 +156,14 @@ app.post(
       const userId = (req as any).userId;
       const { topic, text, level } = req.body;
 
-      // Send the exact body to Python service
-      const aiResponse = await fetch(
-        "http://localhost:8000/generate-flashcards",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ topic, text, level }),
-        },
-      );
+      const aiServiceUrl =
+        process.env.AI_SERVICE_URL || "http://localhost:8000";
+
+      const aiResponse = await fetch(`${aiServiceUrl}/generate-flashcards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, text, level }),
+      });
 
       // Check if Python service returned an error
       if (!aiResponse.ok) {
