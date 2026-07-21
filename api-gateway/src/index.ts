@@ -168,6 +168,22 @@ app.post(
         body: JSON.stringify({ topic, text, level }),
       });
 
+      // Check if the response is actually JSON before trying to parse it
+      const contentType = aiResponse.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const textResponse = await aiResponse.text();
+        console.error(
+          "AI Service returned non-JSON:",
+          textResponse.substring(0, 100),
+        );
+        return res
+          .status(502)
+          .json({
+            error:
+              "Received an invalid HTML response from the AI Microservice.",
+          });
+      }
+
       // Check if Python service returned an error
       if (!aiResponse.ok) {
         const errorData = await aiResponse.json();
