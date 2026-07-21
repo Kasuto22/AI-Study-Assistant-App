@@ -34,7 +34,7 @@ class GenerateRequest(BaseModel):
 
 # Generation Endpoint
 @app.post("/generate-flashcards", response_model=FlashcardDeck)
-async def generate_flashcards(req: GenerateRequest):
+def generate_flashcards(req: GenerateRequest):
     # Check they provided at least one option
     if not req.text and not req.topic:
         raise HTTPException(status_code=400, detail="You must provide either 'text' or 'topic'.")
