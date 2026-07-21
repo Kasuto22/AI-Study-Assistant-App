@@ -2,24 +2,11 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { register } from "node:module";
 
-// Create a native PostgreSQL connection pool
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL!,
-  ssl: {
-    rejectUnauthorized: false,
-  },
-});
-
-const adapter = new PrismaPg(pool);
-
-// Initialize Prisma Client
-const prisma = new PrismaClient({ adapter });
+// Initialize the native Prisma Client
+const prisma = new PrismaClient();
 
 const app = express();
 app.use(cors());
