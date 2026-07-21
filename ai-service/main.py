@@ -43,6 +43,7 @@ class GenerateRequest(BaseModel):
 # Generation Endpoint
 @app.post("/generate-flashcards", response_model=FlashcardDeck)
 def generate_flashcards(req: GenerateRequest):
+    print("Request received by Python microservice!")
     # Check they provided at least one option
     if not req.text and not req.topic:
         raise HTTPException(status_code=400, detail="You must provide either 'text' or 'topic'.")
@@ -56,6 +57,8 @@ def generate_flashcards(req: GenerateRequest):
         else:
             prompt = base_instructions + f"Task: Generate a comprehensive, educational set of study flashcards covering the topic: '{req.topic}'. Ensure the information is accurate and structured."
 
+        print("Prompt prepared. Calling Gemini API now...")
+
         # Call Gemini and force it to match the Pydantic schema
         response = client.models.generate_content(
             model='gemini-3.5-flash',
@@ -66,6 +69,8 @@ def generate_flashcards(req: GenerateRequest):
                 "temperature": 0.3
             }
         )
+
+        print("Response successfully received from Gemini!")
 
         # AI returns JSON string, so we parse it into a python dict before it goes to client
         return json.loads(response.text)
