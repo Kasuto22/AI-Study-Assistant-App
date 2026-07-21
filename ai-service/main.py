@@ -62,7 +62,7 @@ async def generate_flashcards(req: GenerateRequest):
 
         response = await asyncio.wait_for(
             client.aio.models.generate_content(
-                model='gemini-3.5-flash',
+                model='gemini-2.5-flash',
                 contents=prompt,
                 config={
                     "response_mime_type": "application/json",
