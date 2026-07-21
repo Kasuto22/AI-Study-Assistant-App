@@ -7,6 +7,7 @@ import { PrismaNeon } from "@prisma/adapter-neon";
 import ws from "ws";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import rateLimit from "express-rate-limit";
 
 // Tell Neon to use Node's WebSocket implementation
 neonConfig.webSocketConstructor = ws;
@@ -26,9 +27,6 @@ const PORT = process.env.PORT || 3000;
 // Middleware to parse incoming JSON requests
 app.use(express.json());
 
-// How many AI generations a single user can make per day.
-// This protects against bots/abuse now that billing is enabled on the Gemini API —
-// generous enough for real testing and demos, tight enough to bound worst-case cost.
 const DAILY_GENERATION_LIMIT = 20;
 
 // Authentication route
@@ -86,8 +84,20 @@ app.post("/auth/register", async (req, res): Promise<any> => {
   }
 });
 
+// Rate limiter configuration
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes window
+  max: 5, // Limit each IP to 5 login attempts per windowMs
+  message: {
+    error:
+      "Too many login attempts from this IP. Please try again in 15 minutes.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Login endpoint
-app.post("/auth/login", async (req, res): Promise<any> => {
+app.post("/auth/login", loginLimiter, async (req, res): Promise<any> => {
   try {
     const { email, password } = req.body;
 
