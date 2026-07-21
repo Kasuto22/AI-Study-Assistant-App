@@ -26,6 +26,11 @@ const PORT = process.env.PORT || 3000;
 // Middleware to parse incoming JSON requests
 app.use(express.json());
 
+// How many AI generations a single user can make per day.
+// This protects against bots/abuse now that billing is enabled on the Gemini API —
+// generous enough for real testing and demos, tight enough to bound worst-case cost.
+const DAILY_GENERATION_LIMIT = 20;
+
 // Authentication route
 app.post("/auth/register", async (req, res): Promise<any> => {
   try {
@@ -112,7 +117,7 @@ app.post("/auth/login", async (req, res): Promise<any> => {
 });
 
 // Middleware
-//This will be a sort of bouncer for any route that needs the user to be logged in
+// This will be a sort of bouncer for any route that needs the user to be logged in
 const authenticateJWT = (
   req: express.Request,
   res: express.Response,
@@ -125,7 +130,7 @@ const authenticateJWT = (
     return res.status(401).json({ error: "Access denied. No token provided." });
   }
 
-  // Exctract just the token string
+  // Extract just the token string
   const token = authHeader.split(" ")[1];
 
   // Makes sure 'token' is not undefined
@@ -159,13 +164,33 @@ app.post(
       const userId = (req as any).userId;
       const { topic, text, level } = req.body;
 
+      // --- Daily generation limit check ---
+      // Protects against a single user (or bot) racking up Gemini API costs.
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const generationsToday = await prisma.deck.count({
+        where: {
+          userId: userId,
+          createdAt: {
+            gte: startOfToday,
+          },
+        },
+      });
+
+      if (generationsToday >= DAILY_GENERATION_LIMIT) {
+        return res.status(429).json({
+          error: `You've reached today's limit of ${DAILY_GENERATION_LIMIT} AI-generated decks. Please try again tomorrow.`,
+        });
+      }
+
       // Clean the URL just in case there are accidental spaces or trailing slashes
       let aiServiceUrl = process.env.AI_SERVICE_URL || "http://localhost:8000";
       aiServiceUrl = aiServiceUrl.trim().replace(/\/$/, "");
 
       const targetEndpoint = `${aiServiceUrl}/generate-flashcards`;
 
-      console.log("➡️ SENDING AI REQUEST TO:", targetEndpoint);
+      console.log("SENDING AI REQUEST TO:", targetEndpoint);
 
       const aiResponse = await fetch(targetEndpoint, {
         method: "POST",
@@ -182,7 +207,7 @@ app.post(
           textResponse.substring(0, 100),
         );
         return res.status(502).json({
-          error: "Received an invalid HTML response from the AI Microservice.",
+          error: "Received an invalid response from the AI Microservice.",
         });
       }
 
