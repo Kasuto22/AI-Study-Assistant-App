@@ -2,21 +2,20 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import pg from "pg";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import { PrismaNeon } from "@prisma/adapter-neon";
+import ws from "ws";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-// Create the pg pool with SSL and the 10-second cold-start timeout
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  connectionTimeoutMillis: 10000,
-  ssl: {
-    rejectUnauthorized: false,
-  },
-});
+// Tell Neon to use the standard Node WebSocket library
+neonConfig.webSocketConstructor = ws;
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-const adapter = new PrismaPg(pool);
+// Initialize the Neon Adapter
+const adapter = new PrismaNeon(pool as any);
+
+// Initialize Prisma
 const prisma = new PrismaClient({ adapter });
 
 const app = express();
