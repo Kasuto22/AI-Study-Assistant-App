@@ -8,38 +8,13 @@ import ws from "ws";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-console.log("=== DATABASE_URL DIAGNOSTIC ===");
-const dbUrl = process.env.DATABASE_URL || "";
-console.log("Length:", dbUrl.length);
-console.log("First 15 chars:", JSON.stringify(dbUrl.slice(0, 15)));
-console.log("Last 15 chars:", JSON.stringify(dbUrl.slice(-15)));
-console.log(
-  "Has leading/trailing whitespace or newline:",
-  dbUrl !== dbUrl.trim(),
-);
-console.log(
-  "Contains a literal quote char:",
-  dbUrl.includes('"') || dbUrl.includes("'"),
-);
-try {
-  const parsed = new URL(dbUrl.trim());
-  console.log(
-    "Parsed OK — protocol:",
-    parsed.protocol,
-    "| host:",
-    parsed.hostname,
-  );
-} catch (e) {
-  console.log("URL FAILED TO PARSE:", (e as Error).message);
-}
-console.log("================================");
-
-// Tell Neon to use the standard Node WebSocket library
+// Tell Neon to use Node's WebSocket implementation
 neonConfig.webSocketConstructor = ws;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // Initialize the Neon Adapter
-const adapter = new PrismaNeon(pool as any);
+const adapter = new PrismaNeon({
+  connectionString: process.env.DATABASE_URL,
+});
 
 // Initialize Prisma
 const prisma = new PrismaClient({ adapter });
