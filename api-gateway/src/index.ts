@@ -41,6 +41,15 @@ app.post("/auth/register", async (req, res): Promise<any> => {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
+    // Strict Password Validation
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        error:
+          "Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.",
+      });
+    }
+
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email },
