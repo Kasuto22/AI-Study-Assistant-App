@@ -8,6 +8,16 @@ import ws from "ws";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+console.log("=== STARTUP CHECK ===");
+console.log("Is DATABASE_URL present?", !!process.env.DATABASE_URL);
+console.log(
+  "Available Env Keys:",
+  Object.keys(process.env).filter(
+    (key) => key.includes("URL") || key.includes("DATA") || key.includes("JWT"),
+  ),
+);
+console.log("=====================");
+
 // Tell Neon to use the standard Node WebSocket library
 neonConfig.webSocketConstructor = ws;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
