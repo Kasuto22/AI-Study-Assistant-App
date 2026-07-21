@@ -59,8 +59,8 @@ def generate_flashcards(req: GenerateRequest):
 
         print("Prompt prepared. Calling Gemini API now...")
 
-        # Call Gemini and force it to match the Pydantic schema
-        response = client.models.generate_content(
+        # Notice the 'await' and 'client.aio.models' 
+        response = await client.aio.models.generate_content(
             model='gemini-3.5-flash',
             contents=prompt,
             config={
@@ -74,6 +74,9 @@ def generate_flashcards(req: GenerateRequest):
 
         # AI returns JSON string, so we parse it into a python dict before it goes to client
         return json.loads(response.text)
+    except Exception as e:
+        print("🚨 [ERROR] GEMINI API FAILED:", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
