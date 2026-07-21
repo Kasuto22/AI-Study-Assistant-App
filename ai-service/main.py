@@ -42,7 +42,7 @@ class GenerateRequest(BaseModel):
 
 # Generation Endpoint
 @app.post("/generate-flashcards", response_model=FlashcardDeck)
-def generate_flashcards(req: GenerateRequest):
+async def generate_flashcards(req: GenerateRequest):
     print("Request received by Python microservice!")
     # Check they provided at least one option
     if not req.text and not req.topic:
