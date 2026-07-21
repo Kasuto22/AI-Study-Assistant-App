@@ -57,6 +57,8 @@ MAX_INPUT_CHARACTERS = 20000
 
 @app.post("/generate-flashcards", response_model=FlashcardDeck)
 async def generate_flashcards(req: GenerateRequest):
+    print("Request received by Python microservice!")
+
     if not req.text and not req.topic:
         raise HTTPException(status_code=400, detail="You must provide either 'text' or 'topic'.")
 
@@ -87,6 +89,8 @@ async def generate_flashcards(req: GenerateRequest):
                 f"the topic: '{req.topic}'. Ensure the information is accurate and structured."
             )
 
+        print(f"Prompt prepared. Length: {len(prompt)} characters. Calling Gemini API...")
+
         response = await asyncio.wait_for(
             client.aio.models.generate_content(
                 model=GEMINI_MODEL,
@@ -99,6 +103,8 @@ async def generate_flashcards(req: GenerateRequest):
             ),
             timeout=GEMINI_TIMEOUT_SECONDS,
         )
+
+        print("Response successfully received from Gemini!")
 
         return json.loads(response.text)
 
