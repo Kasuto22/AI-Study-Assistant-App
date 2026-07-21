@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -33,19 +34,25 @@ export default function AuthPage() {
 
       if (isLogin) {
         localStorage.setItem("token", data.token);
-        alert("Login successful!");
-        router.push("/dashboard"); // We will uncomment this when the dashboard is built
+        toast.success("Login successful!");
+        router.push("/dashboard");
       } else {
-        alert("Registration successful! You can now log in.");
+        toast.success("Registration successful! You can now log in.");
         setIsLogin(true);
         setPassword("");
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
+        toast.error(err.message);
       } else {
         setError("An unexpected error occurred");
+        toast.error("An unexpected error occurred");
       }
+    } finally {
+      // This ALWAYS runs — success, error, or thrown exception —
+      // so the button can never get stuck disabled again.
+      setIsLoading(false);
     }
   };
 
@@ -80,16 +87,20 @@ export default function AuthPage() {
       const data = await loginRes.json();
       if (!loginRes.ok) throw new Error(data.error || "Guest login failed");
 
-      // 4Save token and let them in
+      // Save token and let them in
       localStorage.setItem("token", data.token);
-      alert("Guest account created! You are logged in.");
+      toast.success("Guest account created! You are logged in.");
       router.push("/dashboard");
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
+        toast.error(err.message);
       } else {
         setError("An unexpected error occurred");
+        toast.error("An unexpected error occurred");
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -137,7 +148,7 @@ export default function AuthPage() {
             disabled={isLoading}
             className="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
           >
-            {isLogin ? "Log In" : "Sign Up"}
+            {isLoading ? "Please wait..." : isLogin ? "Log In" : "Sign Up"}
           </button>
         </form>
 
@@ -155,7 +166,7 @@ export default function AuthPage() {
           disabled={isLoading}
           className="mt-6 w-full bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-white font-semibold py-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition disabled:opacity-50"
         >
-          Continue as Guest
+          {isLoading ? "Please wait..." : "Continue as Guest"}
         </button>
 
         <p className="mt-6 text-center text-sm text-gray-600 dark:text-slate-400">

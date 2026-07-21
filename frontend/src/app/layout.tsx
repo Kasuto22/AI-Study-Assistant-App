@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./Providers";
 import ThemeToggle from "./ThemeToggle";
+import { Toaster } from "sonner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,7 +18,6 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // suppressHydrationWarning is required by next-themes to prevent console errors
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${inter.className} bg-gray-50 dark:bg-slate-900 transition-colors duration-300`}
@@ -27,7 +27,10 @@ export default function RootLayout({
           <div className="absolute top-4 right-4 z-50">
             <ThemeToggle />
           </div>
+
           {children}
+
+          <Toaster position="top-center" richColors />
         </Providers>
       </body>
     </html>
