@@ -10,6 +10,9 @@ load_dotenv()
 
 # Initialize API and Gemini client
 app = FastAPI(title="AI Study Assistant Microservice")
+@app.get("/")
+def read_root():
+    return {"status": "AI Microservice is awake and running!"}
 client = genai.Client() #automatically gets key from env
 
 # Strict Pydantic schemas for LLM output

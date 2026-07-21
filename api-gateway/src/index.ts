@@ -159,10 +159,15 @@ app.post(
       const userId = (req as any).userId;
       const { topic, text, level } = req.body;
 
-      const aiServiceUrl =
-        process.env.AI_SERVICE_URL || "http://localhost:8000";
+      // Clean the URL just in case there are accidental spaces or trailing slashes
+      let aiServiceUrl = process.env.AI_SERVICE_URL || "http://localhost:8000";
+      aiServiceUrl = aiServiceUrl.trim().replace(/\/$/, "");
 
-      const aiResponse = await fetch(`${aiServiceUrl}/generate-flashcards`, {
+      const targetEndpoint = `${aiServiceUrl}/generate-flashcards`;
+
+      console.log("➡️ SENDING AI REQUEST TO:", targetEndpoint);
+
+      const aiResponse = await fetch(targetEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic, text, level }),
@@ -176,12 +181,9 @@ app.post(
           "AI Service returned non-JSON:",
           textResponse.substring(0, 100),
         );
-        return res
-          .status(502)
-          .json({
-            error:
-              "Received an invalid HTML response from the AI Microservice.",
-          });
+        return res.status(502).json({
+          error: "Received an invalid HTML response from the AI Microservice.",
+        });
       }
 
       // Check if Python service returned an error
