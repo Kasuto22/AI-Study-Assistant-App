@@ -85,8 +85,10 @@ app.post("/auth/login", async (req, res): Promise<any> => {
       where: { email },
     });
 
-    if (!user) {
-      return res.status(401).json({ error: "Invalid user or password" });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({
+        error: "Invalid user or password",
+      });
     }
 
     const token = jwt.sign(
@@ -626,16 +628,6 @@ app.delete(
 // Basic Health Check endpoint
 app.get("/", (req, res) => {
   res.json({ message: "API Gateway is live and running!" });
-});
-
-// Test endpoint to interact with PostgreSQL
-app.get("/users", async (req, res) => {
-  try {
-    const users = await prisma.user.findMany();
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch users" });
-  }
 });
 
 // Start the server
