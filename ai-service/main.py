@@ -5,6 +5,7 @@ from google import genai
 from typing import Optional, Literal
 import json
 import os
+import asyncio
 
 # Get environement variables from .env
 load_dotenv()
@@ -57,23 +58,28 @@ async def generate_flashcards(req: GenerateRequest):
         else:
             prompt = base_instructions + f"Task: Generate a comprehensive, educational set of study flashcards covering the topic: '{req.topic}'. Ensure the information is accurate and structured."
 
-        print("Prompt prepared. Calling Gemini API now...")
+        print(f"Prompt prepared. Length: {len(prompt)} characters. Calling Gemini API...")
 
-        # Notice the 'await' and 'client.aio.models' 
-        response = await client.aio.models.generate_content(
-            model='gemini-3.5-flash',
-            contents=prompt,
-            config={
-                "response_mime_type": "application/json",
-                "response_schema": FlashcardDeck,
-                "temperature": 0.3
-            }
+        response = await asyncio.wait_for(
+            client.aio.models.generate_content(
+                model='gemini-3.5-flash',
+                contents=prompt,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": FlashcardDeck,
+                    "temperature": 0.3
+                }
+            ),
+            timeout=15.0  # Force it to explode if it hangs longer than 15 seconds
         )
 
         print("Response successfully received from Gemini!")
 
         # AI returns JSON string, so we parse it into a python dict before it goes to client
         return json.loads(response.text)
+    except asyncio.TimeoutError:
+        print("🚨 [ERROR] TIMEOUT: The Gemini SDK hung for 15 seconds and was forcefully killed. The cloud network dropped the connection.")
+        raise HTTPException(status_code=504, detail="Gemini API network timeout. Connection was dropped.")
     except Exception as e:
         print("🚨 [ERROR] GEMINI API FAILED:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
