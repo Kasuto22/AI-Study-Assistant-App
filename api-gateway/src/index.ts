@@ -8,15 +8,31 @@ import ws from "ws";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-console.log("=== STARTUP CHECK ===");
-console.log("Is DATABASE_URL present?", !!process.env.DATABASE_URL);
+console.log("=== DATABASE_URL DIAGNOSTIC ===");
+const dbUrl = process.env.DATABASE_URL || "";
+console.log("Length:", dbUrl.length);
+console.log("First 15 chars:", JSON.stringify(dbUrl.slice(0, 15)));
+console.log("Last 15 chars:", JSON.stringify(dbUrl.slice(-15)));
 console.log(
-  "Available Env Keys:",
-  Object.keys(process.env).filter(
-    (key) => key.includes("URL") || key.includes("DATA") || key.includes("JWT"),
-  ),
+  "Has leading/trailing whitespace or newline:",
+  dbUrl !== dbUrl.trim(),
 );
-console.log("=====================");
+console.log(
+  "Contains a literal quote char:",
+  dbUrl.includes('"') || dbUrl.includes("'"),
+);
+try {
+  const parsed = new URL(dbUrl.trim());
+  console.log(
+    "Parsed OK — protocol:",
+    parsed.protocol,
+    "| host:",
+    parsed.hostname,
+  );
+} catch (e) {
+  console.log("URL FAILED TO PARSE:", (e as Error).message);
+}
+console.log("================================");
 
 // Tell Neon to use the standard Node WebSocket library
 neonConfig.webSocketConstructor = ws;
