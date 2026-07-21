@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from google import genai
 from typing import Optional, Literal
 import json
+import os
 
 # Get environement variables from .env
 load_dotenv()
@@ -13,7 +14,14 @@ app = FastAPI(title="AI Study Assistant Microservice")
 @app.get("/")
 def read_root():
     return {"status": "AI Microservice is awake and running!"}
-client = genai.Client() #automatically gets key from env
+
+# Force the app to check for the key immediately
+api_key = os.getenv("GEMINI_API_KEY")
+if not api_key:
+    print("GEMINI_API_KEY is missing from the environment!")
+
+# Initialize Gemini client explicitly
+client = genai.Client(api_key=api_key)
 
 # Strict Pydantic schemas for LLM output
 class Flashcard(BaseModel):
