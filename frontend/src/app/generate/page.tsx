@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { fetchWithAuth } from "@/utils/api"; // <-- Import wrapper
 
 export default function GeneratePage() {
   // State Management
@@ -29,11 +30,6 @@ export default function GeneratePage() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("You must be logged in to generate flashcards.");
-      }
-
       // Build the exact payload the Python microservice expects
       const payload = {
         topic: topic.trim() ? topic.trim() : undefined,
@@ -41,18 +37,11 @@ export default function GeneratePage() {
         level: level,
       };
 
-      // Send to Node.js API Gateway
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/generate`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        },
-      );
+      // Send to Node.js API Gateway using the global auth wrapper
+      const res = await fetchWithAuth("/api/generate", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
 
       const data = await res.json();
 

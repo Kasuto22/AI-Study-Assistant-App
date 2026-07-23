@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { fetchWithAuth } from "@/utils/api";
 
 interface Flashcard {
   id: string;
@@ -25,29 +26,25 @@ export default function DeckOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Grid View State
   const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
+
+  // Carousel Browse State
+  const [viewMode, setViewMode] = useState<"grid" | "carousel">("grid");
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [carouselFlipped, setCarouselFlipped] = useState(false);
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
-  // We store the draft edits in a dictionary where the key is the cardId
   const [editFormData, setEditFormData] = useState<
     Record<string, { front: string; back: string }>
   >({});
 
   useEffect(() => {
-    // Declare the async function INSIDE the effect
     const fetchDeck = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/decks/${deckId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-
+        const res = await fetchWithAuth(`/api/decks/${deckId}`);
         if (!res.ok) throw new Error("Failed to load deck details");
-
         const data = await res.json();
         setDeck(data);
       } catch (err: unknown) {
@@ -56,15 +53,13 @@ export default function DeckOverviewPage() {
         setLoading(false);
       }
     };
-
-    // Call it immediately
     fetchDeck();
   }, [deckId]);
 
-  // Toggle edit mode
+  // --- Grid & Edit Handlers ---
   const toggleEditMode = () => {
     if (!isEditing && deck) {
-      // When turning ON edit mode, populate the form data with the current card text
+      setViewMode("grid"); // Force grid view when editing
       const initialData: Record<string, { front: string; back: string }> = {};
       deck.cards.forEach((card) => {
         initialData[card.id] = { front: card.front, back: card.back };
@@ -85,27 +80,16 @@ export default function DeckOverviewPage() {
     }));
   };
 
-  // Api calls
   const handleUpdateCard = async (cardId: string) => {
     try {
-      const token = localStorage.getItem("token");
       const { front, back } = editFormData[cardId];
-
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/flashcards/${cardId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ front, back }),
-        },
-      );
+      const res = await fetchWithAuth(`/api/flashcards/${cardId}`, {
+        method: "PUT",
+        body: JSON.stringify({ front, back }),
+      });
 
       if (!res.ok) throw new Error("Failed to update card");
 
-      // Update local state instantly so the user sees the change
       setDeck((prev) =>
         prev
           ? {
@@ -116,7 +100,6 @@ export default function DeckOverviewPage() {
             }
           : null,
       );
-
       alert("Card updated successfully!");
     } catch (error: unknown) {
       console.error("Update Error:", error);
@@ -127,20 +110,12 @@ export default function DeckOverviewPage() {
   const handleDeleteCard = async (cardId: string) => {
     if (!window.confirm("Are you sure you want to delete this card forever?"))
       return;
-
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/flashcards/${cardId}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-
+      const res = await fetchWithAuth(`/api/flashcards/${cardId}`, {
+        method: "DELETE",
+      });
       if (!res.ok) throw new Error("Failed to delete card");
 
-      // Remove it from the local screen instantly
       setDeck((prev) =>
         prev
           ? {
@@ -158,23 +133,15 @@ export default function DeckOverviewPage() {
   const handleDeleteDeck = async () => {
     if (
       !window.confirm(
-        "WARNING: This will delete the entire deck and all its memory stats forever. Continue?",
+        "WARNING: This will delete the entire deck forever. Continue?",
       )
     )
       return;
-
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/decks/${deckId}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-
+      const res = await fetchWithAuth(`/api/decks/${deckId}`, {
+        method: "DELETE",
+      });
       if (!res.ok) throw new Error("Failed to delete deck");
-
       router.push("/dashboard");
     } catch (error: unknown) {
       console.error("Delete Deck Error:", error);
@@ -182,15 +149,32 @@ export default function DeckOverviewPage() {
     }
   };
 
-  // Helper for casual review
-  const toggleFlip = (cardId: string) => {
-    if (isEditing) return; // Disable flipping while in edit mode
+  const toggleGridFlip = (cardId: string) => {
+    if (isEditing) return;
     setFlippedCards((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(cardId)) newSet.delete(cardId);
       else newSet.add(cardId);
       return newSet;
     });
+  };
+
+  // --- Carousel Handlers ---
+  const handleNextCarousel = () => {
+    setCarouselFlipped(false);
+    setTimeout(() => {
+      setCarouselIndex((prev) => (prev + 1) % (deck?.cards.length || 1));
+    }, 150);
+  };
+
+  const handlePrevCarousel = () => {
+    setCarouselFlipped(false);
+    setTimeout(() => {
+      setCarouselIndex(
+        (prev) =>
+          (prev - 1 + (deck?.cards.length || 1)) % (deck?.cards.length || 1),
+      );
+    }, 150);
   };
 
   if (loading)
@@ -236,6 +220,24 @@ export default function DeckOverviewPage() {
                 Delete Entire Deck
               </button>
             )}
+
+            {!isEditing && (
+              <div className="flex bg-gray-200 dark:bg-slate-700 rounded-lg p-1 mr-2">
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${viewMode === "grid" ? "bg-white dark:bg-slate-800 text-gray-900 dark:text-white shadow-sm" : "text-gray-500 dark:text-slate-400 hover:text-gray-700"}`}
+                >
+                  Grid
+                </button>
+                <button
+                  onClick={() => setViewMode("carousel")}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${viewMode === "carousel" ? "bg-white dark:bg-slate-800 text-gray-900 dark:text-white shadow-sm" : "text-gray-500 dark:text-slate-400 hover:text-gray-700"}`}
+                >
+                  Carousel
+                </button>
+              </div>
+            )}
+
             <button
               onClick={toggleEditMode}
               className={`px-4 py-2 font-medium rounded-lg transition ${
@@ -246,6 +248,7 @@ export default function DeckOverviewPage() {
             >
               {isEditing ? "Done Editing" : "Edit Cards"}
             </button>
+
             {!isEditing && (
               <Link
                 href={`/study/${deckId}`}
@@ -257,85 +260,160 @@ export default function DeckOverviewPage() {
           </div>
         </div>
 
-        {/* The Grid (Flips between Casual Review and Edit Forms) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {deck.cards.map((card) => {
-            const isFlipped = flippedCards.has(card.id);
+        {/* View Router */}
+        {viewMode === "carousel" && !isEditing ? (
+          /* Normal study mode */
+          <div className="flex flex-col items-center mt-12">
+            <p className="text-slate-500 dark:text-slate-400 mb-6 font-medium tracking-wide uppercase text-sm">
+              Card {carouselIndex + 1} of {deck.cards.length}
+            </p>
 
-            // Edit Mode UI
-            if (isEditing) {
+            <div
+              className="w-full max-w-2xl aspect-[3/2] cursor-pointer"
+              style={{ perspective: "1000px" }}
+              onClick={() => setCarouselFlipped(!carouselFlipped)}
+            >
+              <div
+                className="relative w-full h-full shadow-xl rounded-2xl"
+                style={{
+                  transformStyle: "preserve-3d",
+                  transform: carouselFlipped
+                    ? "rotateY(180deg)"
+                    : "rotateY(0deg)",
+                  transition: "transform 0.5s cubic-bezier(0.4, 0.2, 0.2, 1)",
+                }}
+              >
+                {/* Front */}
+                <div
+                  className="absolute inset-0 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col justify-center items-center p-10 text-center"
+                  style={{ backfaceVisibility: "hidden" }}
+                >
+                  <span className="absolute top-4 left-4 text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Front
+                  </span>
+                  <p className="text-2xl text-slate-800 dark:text-slate-100 font-medium leading-relaxed">
+                    {deck.cards[carouselIndex].front}
+                  </p>
+                </div>
+
+                {/* Back */}
+                <div
+                  className="absolute inset-0 bg-blue-50 dark:bg-slate-700 rounded-2xl border border-blue-100 dark:border-slate-600 flex flex-col justify-center items-center p-10 text-center"
+                  style={{
+                    backfaceVisibility: "hidden",
+                    transform: "rotateY(180deg)",
+                  }}
+                >
+                  <span className="absolute top-4 left-4 text-xs font-bold uppercase tracking-wider text-blue-400 dark:text-slate-400">
+                    Back
+                  </span>
+                  <p className="text-xl text-slate-800 dark:text-slate-100 leading-relaxed">
+                    {deck.cards[carouselIndex].back}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-4 mt-8">
+              <button
+                onClick={handlePrevCarousel}
+                className="px-6 py-3 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setCarouselFlipped(!carouselFlipped)}
+                className="px-8 py-3 bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white font-medium rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition"
+              >
+                Flip Card
+              </button>
+              <button
+                onClick={handleNextCarousel}
+                className="px-6 py-3 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Grid overview and edit mode */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {deck.cards.map((card) => {
+              const isFlipped = flippedCards.has(card.id);
+
+              if (isEditing) {
+                return (
+                  <div
+                    key={card.id}
+                    className="p-5 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-600 flex flex-col gap-3"
+                  >
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase">
+                        Front (Question)
+                      </label>
+                      <textarea
+                        value={editFormData[card.id]?.front || ""}
+                        onChange={(e) =>
+                          handleFormChange(card.id, "front", e.target.value)
+                        }
+                        className="w-full mt-1 p-2 border rounded bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-white resize-none"
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase">
+                        Back (Answer)
+                      </label>
+                      <textarea
+                        value={editFormData[card.id]?.back || ""}
+                        onChange={(e) =>
+                          handleFormChange(card.id, "back", e.target.value)
+                        }
+                        className="w-full mt-1 p-2 border rounded bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-white resize-none"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-2">
+                      <button
+                        onClick={() => handleDeleteCard(card.id)}
+                        className="text-red-500 hover:text-red-700 text-sm font-medium transition"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => handleUpdateCard(card.id)}
+                        className="px-4 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900/60 font-medium text-sm transition"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div
                   key={card.id}
-                  className="p-5 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-600 flex flex-col gap-3"
+                  onClick={() => toggleGridFlip(card.id)}
+                  className={`relative min-h-[200px] p-6 rounded-2xl shadow-sm border cursor-pointer transition-all duration-300 flex items-center justify-center text-center ${
+                    isFlipped
+                      ? "bg-white dark:bg-slate-800 border-blue-400 dark:border-blue-500"
+                      : "bg-blue-50 dark:bg-slate-700 border-blue-100 dark:border-slate-600 hover:shadow-md"
+                  }`}
                 >
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase">
-                      Front (Question)
-                    </label>
-                    <textarea
-                      value={editFormData[card.id]?.front || ""}
-                      onChange={(e) =>
-                        handleFormChange(card.id, "front", e.target.value)
-                      }
-                      className="w-full mt-1 p-2 border rounded bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-white resize-none"
-                      rows={3}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase">
-                      Back (Answer)
-                    </label>
-                    <textarea
-                      value={editFormData[card.id]?.back || ""}
-                      onChange={(e) =>
-                        handleFormChange(card.id, "back", e.target.value)
-                      }
-                      className="w-full mt-1 p-2 border rounded bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-white resize-none"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="flex justify-between mt-2">
-                    <button
-                      onClick={() => handleDeleteCard(card.id)}
-                      className="text-red-500 hover:text-red-700 text-sm font-medium transition"
-                    >
-                      Delete
-                    </button>
-                    <button
-                      onClick={() => handleUpdateCard(card.id)}
-                      className="px-4 py-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 rounded hover:bg-blue-200 dark:hover:bg-blue-900/60 font-medium text-sm transition"
-                    >
-                      Save
-                    </button>
-                  </div>
+                  <p
+                    className={`text-lg ${isFlipped ? "text-gray-800 dark:text-gray-100" : "text-gray-900 dark:text-white font-medium"}`}
+                  >
+                    {isFlipped ? card.back : card.front}
+                  </p>
+                  <span className="absolute bottom-3 right-4 text-xs text-gray-400 dark:text-slate-500">
+                    {isFlipped ? "Answer" : "Question"}
+                  </span>
                 </div>
               );
-            }
-
-            // Casual review UI
-            return (
-              <div
-                key={card.id}
-                onClick={() => toggleFlip(card.id)}
-                className={`relative min-h-[200px] p-6 rounded-2xl shadow-sm border cursor-pointer transition-all duration-300 flex items-center justify-center text-center ${
-                  isFlipped
-                    ? "bg-white dark:bg-slate-800 border-blue-400 dark:border-blue-500"
-                    : "bg-blue-50 dark:bg-slate-700 border-blue-100 dark:border-slate-600 hover:shadow-md"
-                }`}
-              >
-                <p
-                  className={`text-lg ${isFlipped ? "text-gray-800 dark:text-gray-100" : "text-gray-900 dark:text-white font-medium"}`}
-                >
-                  {isFlipped ? card.back : card.front}
-                </p>
-                <span className="absolute bottom-3 right-4 text-xs text-gray-400 dark:text-slate-500">
-                  {isFlipped ? "Answer" : "Question"}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+            })}
+          </div>
+        )}
       </div>
     </main>
   );

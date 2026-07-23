@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { fetchWithAuth } from "@/utils/api";
 
-// Define what a "Deck" looks like so TypeScript is happy
 interface Deck {
   id: string;
   title: string;
@@ -28,19 +28,10 @@ export default function Dashboard() {
       return;
     }
 
-    // Fetch the user's decks from the backend
+    // Fetch the user's decks using the auth wrapper
     const fetchDecks = async () => {
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/decks`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
+        const res = await fetchWithAuth("/api/decks");
 
         if (!res.ok) throw new Error("Failed to fetch decks");
 
@@ -58,7 +49,7 @@ export default function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem("token");
-    router.push("/");
+    router.push("/auth");
   };
 
   if (loading) {

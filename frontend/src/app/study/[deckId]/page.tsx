@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-
+import { fetchWithAuth } from "@/utils/api";
 interface Flashcard {
   id: string;
   front: string;
@@ -12,8 +12,7 @@ interface Flashcard {
 
 export default function StudyPage() {
   const params = useParams();
-  const deckId = params.deckId as string; // Grabs the ID right out of the URL
-  const router = useRouter();
+  const deckId = params.deckId as string;
 
   // State
   const [cards, setCards] = useState<Flashcard[]>([]);
@@ -27,19 +26,8 @@ export default function StudyPage() {
   useEffect(() => {
     const fetchDueCards = async () => {
       try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          router.push("/auth");
-          return;
-        }
-
-        // We hit the specific endpoint that ONLY returns cards due for review today
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/decks/${deckId}/study`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
+        // Look how clean this is! The wrapper handles the token, URL, and 401s.
+        const res = await fetchWithAuth(`/api/decks/${deckId}/study`);
 
         if (!res.ok) throw new Error("Failed to load cards");
 
@@ -53,7 +41,7 @@ export default function StudyPage() {
     };
 
     fetchDueCards();
-  }, [deckId, router]);
+  }, [deckId]);
 
   // Grade and next card
   const handleGrade = async (score: number) => {
@@ -63,18 +51,11 @@ export default function StudyPage() {
     const currentCard = cards[currentIndex];
 
     try {
-      const token = localStorage.getItem("token");
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/flashcards/${currentCard.id}/review`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ score }),
-        },
-      );
+      // Cleaned up PUT request
+      await fetchWithAuth(`/api/flashcards/${currentCard.id}/review`, {
+        method: "PUT",
+        body: JSON.stringify({ score }),
+      });
 
       // Move to the next card and flip back to the front
       setIsFlipped(false);
