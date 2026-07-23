@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { fetchWithAuth } from "@/utils/api";
+import { toast } from "sonner"; // <-- Added toast import
+
 interface Flashcard {
   id: string;
   front: string;
@@ -26,11 +28,8 @@ export default function StudyPage() {
   useEffect(() => {
     const fetchDueCards = async () => {
       try {
-        // Look how clean this is! The wrapper handles the token, URL, and 401s.
         const res = await fetchWithAuth(`/api/decks/${deckId}/study`);
-
         if (!res.ok) throw new Error("Failed to load cards");
-
         const data = await res.json();
         setCards(data);
       } catch (err: unknown) {
@@ -39,7 +38,6 @@ export default function StudyPage() {
         setLoading(false);
       }
     };
-
     fetchDueCards();
   }, [deckId]);
 
@@ -51,23 +49,22 @@ export default function StudyPage() {
     const currentCard = cards[currentIndex];
 
     try {
-      // Cleaned up PUT request
       await fetchWithAuth(`/api/flashcards/${currentCard.id}/review`, {
         method: "PUT",
         body: JSON.stringify({ score }),
       });
 
-      // Move to the next card and flip back to the front
       setIsFlipped(false);
       setCurrentIndex((prev) => prev + 1);
     } catch (err) {
-      alert("Failed to save review. Please try again.");
+      // Replaced native alert with toast
+      toast.error("Failed to save review. Please try again.");
     } finally {
       setSavingReview(false);
     }
   };
 
-  // Render Logic
+  // ... (The rest of your JSX rendering remains exactly the same as before)
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900 transition-colors">
@@ -89,7 +86,6 @@ export default function StudyPage() {
     );
   }
 
-  // If there are no cards, or the user finished them all!
   if (cards.length === 0 || currentIndex >= cards.length) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-slate-900 transition-colors p-6">
@@ -116,7 +112,6 @@ export default function StudyPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center bg-gray-50 dark:bg-slate-900 p-4 transition-colors duration-300">
-      {/* Header */}
       <div className="w-full max-w-2xl mt-8 mb-6 flex justify-between items-center">
         <Link
           href="/dashboard"
@@ -128,8 +123,6 @@ export default function StudyPage() {
           Card {currentIndex + 1} of {cards.length}
         </div>
       </div>
-
-      {/* The Flashcard */}
       <div
         onClick={() => !isFlipped && setIsFlipped(true)}
         className={`w-full max-w-2xl min-h-[400px] p-8 rounded-3xl shadow-lg flex flex-col justify-center items-center text-center cursor-pointer transition-all duration-300 ${
@@ -143,7 +136,6 @@ export default function StudyPage() {
         >
           {isFlipped ? currentCard.back : currentCard.front}
         </p>
-
         {!isFlipped && (
           <p className="text-blue-200 text-sm mt-12 animate-bounce">
             Click to reveal answer
@@ -151,7 +143,6 @@ export default function StudyPage() {
         )}
       </div>
 
-      {/* Spaced Repetition Grading Buttons */}
       {isFlipped && (
         <div className="w-full max-w-2xl mt-8 flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
           <p className="text-gray-600 dark:text-slate-300 mb-4 font-medium">

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { fetchWithAuth } from "@/utils/api";
+import { toast } from "sonner";
 
 interface Flashcard {
   id: string;
@@ -26,19 +27,27 @@ export default function DeckOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Grid View State
   const [flippedCards, setFlippedCards] = useState<Set<string>>(new Set());
-
-  // Carousel Browse State
   const [viewMode, setViewMode] = useState<"grid" | "carousel">("grid");
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [carouselFlipped, setCarouselFlipped] = useState(false);
 
-  // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
   const [editFormData, setEditFormData] = useState<
     Record<string, { front: string; back: string }>
   >({});
+
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   useEffect(() => {
     const fetchDeck = async () => {
@@ -56,10 +65,9 @@ export default function DeckOverviewPage() {
     fetchDeck();
   }, [deckId]);
 
-  // --- Grid & Edit Handlers ---
   const toggleEditMode = () => {
     if (!isEditing && deck) {
-      setViewMode("grid"); // Force grid view when editing
+      setViewMode("grid");
       const initialData: Record<string, { front: string; back: string }> = {};
       deck.cards.forEach((card) => {
         initialData[card.id] = { front: card.front, back: card.back };
@@ -100,53 +108,63 @@ export default function DeckOverviewPage() {
             }
           : null,
       );
-      alert("Card updated successfully!");
+      toast.success("Card updated successfully!"); // <-- Replaced alert
     } catch (error: unknown) {
-      console.error("Update Error:", error);
-      alert("Error updating card.");
+      toast.error("Error updating card."); // <-- Replaced alert
     }
   };
 
-  const handleDeleteCard = async (cardId: string) => {
-    if (!window.confirm("Are you sure you want to delete this card forever?"))
-      return;
-    try {
-      const res = await fetchWithAuth(`/api/flashcards/${cardId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to delete card");
+  // NEW: Prepares the modal for deleting a single card
+  const confirmDeleteCard = (cardId: string) => {
+    setModalConfig({
+      isOpen: true,
+      title: "Delete Flashcard",
+      message:
+        "Are you sure you want to delete this card? This action cannot be undone.",
+      onConfirm: async () => {
+        try {
+          const res = await fetchWithAuth(`/api/flashcards/${cardId}`, {
+            method: "DELETE",
+          });
+          if (!res.ok) throw new Error("Failed to delete card");
 
-      setDeck((prev) =>
-        prev
-          ? {
-              ...prev,
-              cards: prev.cards.filter((c) => c.id !== cardId),
-            }
-          : null,
-      );
-    } catch (error: unknown) {
-      console.error("Delete Card Error:", error);
-      alert("Error deleting card.");
-    }
+          setDeck((prev) =>
+            prev
+              ? { ...prev, cards: prev.cards.filter((c) => c.id !== cardId) }
+              : null,
+          );
+          toast.success("Card deleted.");
+        } catch (error: unknown) {
+          toast.error("Error deleting card.");
+        } finally {
+          setModalConfig({ ...modalConfig, isOpen: false });
+        }
+      },
+    });
   };
 
-  const handleDeleteDeck = async () => {
-    if (
-      !window.confirm(
-        "WARNING: This will delete the entire deck forever. Continue?",
-      )
-    )
-      return;
-    try {
-      const res = await fetchWithAuth(`/api/decks/${deckId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to delete deck");
-      router.push("/dashboard");
-    } catch (error: unknown) {
-      console.error("Delete Deck Error:", error);
-      alert("Error deleting deck.");
-    }
+  // NEW: Prepares the modal for deleting an entire deck
+  const confirmDeleteDeck = () => {
+    setModalConfig({
+      isOpen: true,
+      title: "Delete Entire Deck",
+      message:
+        "WARNING: This will permanently delete this deck and all its spaced-repetition memory stats. Continue?",
+      onConfirm: async () => {
+        try {
+          const res = await fetchWithAuth(`/api/decks/${deckId}`, {
+            method: "DELETE",
+          });
+          if (!res.ok) throw new Error("Failed to delete deck");
+
+          toast.success("Deck deleted.");
+          router.push("/dashboard");
+        } catch (error: unknown) {
+          toast.error("Error deleting deck.");
+          setModalConfig({ ...modalConfig, isOpen: false });
+        }
+      },
+    });
   };
 
   const toggleGridFlip = (cardId: string) => {
@@ -159,7 +177,6 @@ export default function DeckOverviewPage() {
     });
   };
 
-  // --- Carousel Handlers ---
   const handleNextCarousel = () => {
     setCarouselFlipped(false);
     setTimeout(() => {
@@ -191,7 +208,37 @@ export default function DeckOverviewPage() {
     );
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-slate-900 p-8 transition-colors duration-300">
+    <main className="min-h-screen bg-gray-50 dark:bg-slate-900 p-8 transition-colors duration-300 relative">
+      {/* Custom Tailwind Confirmation Modal */}
+      {modalConfig.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-gray-100 dark:border-slate-700 animate-in zoom-in-95 duration-200">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              {modalConfig.title}
+            </h3>
+            <p className="text-gray-500 dark:text-slate-400 mb-6 text-sm">
+              {modalConfig.message}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() =>
+                  setModalConfig({ ...modalConfig, isOpen: false })
+                }
+                className="px-4 py-2 font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={modalConfig.onConfirm}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg shadow-sm transition"
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-5xl mx-auto mt-8">
         <Link
           href="/dashboard"
@@ -214,7 +261,7 @@ export default function DeckOverviewPage() {
           <div className="flex flex-wrap gap-3">
             {isEditing && (
               <button
-                onClick={handleDeleteDeck}
+                onClick={confirmDeleteDeck} // <-- Updated trigger
                 className="px-4 py-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-medium rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition"
               >
                 Delete Entire Deck
@@ -262,7 +309,7 @@ export default function DeckOverviewPage() {
 
         {/* View Router */}
         {viewMode === "carousel" && !isEditing ? (
-          /* Normal study mode */
+          /* CAROUSEL BROWSE MODE */
           <div className="flex flex-col items-center mt-12">
             <p className="text-slate-500 dark:text-slate-400 mb-6 font-medium tracking-wide uppercase text-sm">
               Card {carouselIndex + 1} of {deck.cards.length}
@@ -283,7 +330,6 @@ export default function DeckOverviewPage() {
                   transition: "transform 0.5s cubic-bezier(0.4, 0.2, 0.2, 1)",
                 }}
               >
-                {/* Front */}
                 <div
                   className="absolute inset-0 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col justify-center items-center p-10 text-center"
                   style={{ backfaceVisibility: "hidden" }}
@@ -295,8 +341,6 @@ export default function DeckOverviewPage() {
                     {deck.cards[carouselIndex].front}
                   </p>
                 </div>
-
-                {/* Back */}
                 <div
                   className="absolute inset-0 bg-blue-50 dark:bg-slate-700 rounded-2xl border border-blue-100 dark:border-slate-600 flex flex-col justify-center items-center p-10 text-center"
                   style={{
@@ -336,7 +380,7 @@ export default function DeckOverviewPage() {
             </div>
           </div>
         ) : (
-          /* Grid overview and edit mode */
+          /* GRID OVERVIEW & EDIT MODE */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {deck.cards.map((card) => {
               const isFlipped = flippedCards.has(card.id);
@@ -375,7 +419,7 @@ export default function DeckOverviewPage() {
                     </div>
                     <div className="flex justify-between mt-2">
                       <button
-                        onClick={() => handleDeleteCard(card.id)}
+                        onClick={() => confirmDeleteCard(card.id)}
                         className="text-red-500 hover:text-red-700 text-sm font-medium transition"
                       >
                         Delete

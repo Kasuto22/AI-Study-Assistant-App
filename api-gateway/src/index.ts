@@ -8,6 +8,8 @@ import ws from "ws";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
+import crypto from "crypto";
+import { Resend } from "resend";
 
 // Tell Neon to use Node's WebSocket implementation
 neonConfig.webSocketConstructor = ws;
@@ -23,6 +25,9 @@ const prisma = new PrismaClient({ adapter });
 const app = express();
 app.use(cors());
 const PORT = process.env.PORT || 3000;
+
+// Initialize Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Middleware to parse incoming JSON requests
 app.use(express.json());
@@ -132,6 +137,124 @@ app.post("/auth/login", loginLimiter, async (req, res): Promise<any> => {
   } catch (error) {
     console.error("Login Error:", error);
     res.status(500).json({ error: "Internal server error during login" });
+  }
+});
+
+// Forgot password route
+app.post("/auth/forgot-password", async (req, res): Promise<any> => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    // Don't reveal if the user exists
+    if (!user) {
+      return res.status(200).json({
+        message:
+          "If an account with that email exists, a reset link has been sent.",
+      });
+    }
+
+    // Generate a secure random token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    // Set expiration to 1 hour from now
+    const resetTokenExpiry = new Date(Date.now() + 3600000);
+
+    // Save the token and expiry to the user in the database
+    await prisma.user.update({
+      where: { email },
+      data: {
+        resetToken,
+        resetTokenExpiry,
+      },
+    });
+
+    // Build the reset link
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const resetLink = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
+
+    await resend.emails.send({
+      from: "onboarding@resend.dev",
+      to: email,
+      subject: "Reset Your Password - Flashcard AI",
+      html: `
+        <h2>Password Reset Request</h2>
+        <p>You recently requested to reset your password. Click the link below to securely change it.</p>
+        <a href="${resetLink}" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;margin-top:10px;">
+          Reset Password
+        </a>
+        <p style="margin-top:20px;font-size:12px;color:gray;">
+          If you did not request this, you can safely ignore this email. This link will expire in 1 hour.
+        </p>
+      `,
+    });
+
+    res.status(200).json({
+      message:
+        "If an account with that email exists, a reset link has been sent.",
+    });
+  } catch (error) {
+    console.error("Forgot Password Error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Reset password route
+app.post("/auth/reset-password", async (req, res): Promise<any> => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res
+        .status(400)
+        .json({ error: "Token and new password are required" });
+    }
+
+    // Backend Validation
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        error:
+          "Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character.",
+      });
+    }
+
+    // Find the user with this token, ensuring it hasn't expired
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: token,
+        resetTokenExpiry: {
+          gt: new Date(),
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Invalid or expired reset token" });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the user's password and destroy the tokens so they can't be reused
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiry: null,
+      },
+    });
+
+    res.status(200).json({ message: "Password has been successfully reset" });
+  } catch (error) {
+    console.error("Reset Password Error:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

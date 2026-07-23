@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link"; // <-- Added this import
 import { toast } from "sonner";
 
 const contributors = [
@@ -211,6 +212,18 @@ export default function AuthPage() {
                 )}
               </button>
             </div>
+
+            {/* The "Forgot Password?" Link */}
+            {isLogin && (
+              <div className="flex justify-end mt-2">
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Forgot your password?
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Password Requirements Checklist (Only visible on Sign Up) */}
