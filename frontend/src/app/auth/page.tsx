@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link"; // <-- Added this import
+import Link from "next/link";
 import { toast } from "sonner";
 
 const contributors = [
