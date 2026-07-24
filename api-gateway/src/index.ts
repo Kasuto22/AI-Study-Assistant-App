@@ -210,11 +210,6 @@ app.post("/auth/forgot-password", async (req, res): Promise<any> => {
       message:
         "If an account with that email exists, a reset link has been sent.",
     });
-
-    res.status(200).json({
-      message:
-        "If an account with that email exists, a reset link has been sent.",
-    });
   } catch (error) {
     console.error("Forgot Password Error:", error);
     res.status(500).json({ error: "Internal server error" });
