@@ -9,7 +9,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import crypto from "crypto";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
 // Tell Neon to use Node's WebSocket implementation
 neonConfig.webSocketConstructor = ws;
@@ -26,8 +26,14 @@ const app = express();
 app.use(cors());
 const PORT = process.env.PORT || 3000;
 
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Set up the Gmail transporter
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+});
 
 // Middleware to parse incoming JSON requests
 app.use(express.json());
@@ -178,20 +184,33 @@ app.post("/auth/forgot-password", async (req, res): Promise<any> => {
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const resetLink = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
 
-    await resend.emails.send({
-      from: "onboarding@resend.dev",
-      to: email,
-      subject: "Reset Your Password - Flashcard AI",
-      html: `
-        <h2>Password Reset Request</h2>
-        <p>You recently requested to reset your password. Click the link below to securely change it.</p>
-        <a href="${resetLink}" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;margin-top:10px;">
-          Reset Password
-        </a>
-        <p style="margin-top:20px;font-size:12px;color:gray;">
-          If you did not request this, you can safely ignore this email. This link will expire in 1 hour.
-        </p>
-      `,
+    // Send the email using Nodemailer & Gmail
+    try {
+      await transporter.sendMail({
+        from: `"Flashcard AI" <${process.env.GMAIL_USER}>`,
+        to: email,
+        subject: "Reset Your Password - Flashcard AI",
+        html: `
+          <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto;">
+            <h2>Password Reset Request</h2>
+            <p>You recently requested to reset your password. Click the link below to securely change it.</p>
+            <a href="${resetLink}" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;margin-top:10px;">
+              Reset Password
+            </a>
+            <p style="margin-top:20px;font-size:12px;color:gray;">
+              If you did not request this, you can safely ignore this email. This link will expire in 1 hour.
+            </p>
+          </div>
+        `,
+      });
+      console.log(`Reset email sent successfully to ${email}`);
+    } catch (emailError) {
+      console.error("Nodemailer failed to send:", emailError);
+    }
+
+    res.status(200).json({
+      message:
+        "If an account with that email exists, a reset link has been sent.",
     });
 
     res.status(200).json({
