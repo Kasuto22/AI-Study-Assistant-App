@@ -16,6 +16,9 @@ model User {
   password  String   // This will store the hashed password
   // Password Reset Fields
   resetToken          String?     // Optional because it's only set when they request a reset
+  // Email Verification Fields
+  isVerified          Boolean     @default(false)
+  verificationToken   String?
   resetTokenExpiry    DateTime?
   decks     Deck[]   // A user can have many decks
   createdAt DateTime @default(now())

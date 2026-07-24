@@ -69,7 +69,9 @@ export default function AuthPage() {
         toast.success("Login successful!");
         router.push("/dashboard");
       } else {
-        toast.success("Registration successful! You can now log in.");
+        toast.success(
+          "Registration successful! Please check your email to verify your account.",
+        );
         setIsLogin(true);
         setPassword("");
       }

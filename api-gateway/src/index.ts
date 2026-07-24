@@ -65,27 +65,83 @@ app.post("/auth/register", async (req, res): Promise<any> => {
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Generate Verification Token
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+
     // Save new user to database
     const newUser = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
+        verificationToken,
       },
     });
 
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const verifyLink = `${frontendUrl}/auth/verify?token=${verificationToken}`;
+
+    // Send Verification Email via SendGrid
+    try {
+      await sgMail.send({
+        to: email,
+        from: process.env.GMAIL_USER as string, // MUST be the exact email you verified in SendGrid
+        subject: "Verify Your Email - Flashcard AI",
+        html: `
+          <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto;">
+            <h2>Welcome to Flashcard AI!</h2>
+            <p>Please click the link below to verify your email address and activate your account.</p>
+            <a href="${verifyLink}" style="display:inline-block;padding:10px 20px;background-color:#2563eb;color:white;text-decoration:none;border-radius:5px;margin-top:10px;">
+              Verify Email
+            </a>
+          </div>
+        `,
+      });
+    } catch (emailError) {
+      console.error("Failed to send verification email:", emailError);
+    }
+
     // Success response
-    res.status(201).json({
-      message: "User registered successfully",
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-      },
-    });
+    return res
+      .status(201)
+      .json({ message: "User created. Please verify your email." });
   } catch (error) {
     console.error("Registration Error:", error);
-    res
+    return res
       .status(500)
       .json({ error: "Internal server error during registration" });
+  }
+});
+
+// Email Verification Route
+app.post("/auth/verify", async (req, res): Promise<any> => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: "Verification token is required" });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { verificationToken: token },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Invalid verification token" });
+    }
+
+    // Activate the user and destroy the token
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isVerified: true,
+        verificationToken: null,
+      },
+    });
+
+    return res.status(200).json({ message: "Email verified successfully" });
+  } catch (error) {
+    console.error("Verification Error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -118,6 +174,13 @@ app.post("/auth/login", loginLimiter, async (req, res): Promise<any> => {
       return res.status(401).json({
         error: "Invalid user or password",
       });
+    }
+
+    // Block login if email is not verified (allows guest accounts to bypass)
+    if (!user.isVerified && !user.email.includes("guest_")) {
+      return res
+        .status(403)
+        .json({ error: "Please verify your email before logging in." });
     }
 
     const token = jwt.sign(
@@ -206,13 +269,15 @@ app.post("/auth/forgot-password", async (req, res): Promise<any> => {
       );
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       message:
         "If an account with that email exists, a reset link has been sent.",
     });
   } catch (error) {
     console.error("Forgot Password Error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    if (!res.headersSent) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
   }
 });
 
@@ -263,10 +328,12 @@ app.post("/auth/reset-password", async (req, res): Promise<any> => {
       },
     });
 
-    res.status(200).json({ message: "Password has been successfully reset" });
+    return res
+      .status(200)
+      .json({ message: "Password has been successfully reset" });
   } catch (error) {
     console.error("Reset Password Error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
