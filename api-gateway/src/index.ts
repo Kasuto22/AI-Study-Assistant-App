@@ -9,7 +9,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import rateLimit from "express-rate-limit";
 import crypto from "crypto";
-import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 
 // Tell Neon to use Node's WebSocket implementation
 neonConfig.webSocketConstructor = ws;
@@ -26,14 +26,8 @@ const app = express();
 app.use(cors());
 const PORT = process.env.PORT || 3000;
 
-// Set up the Gmail transporter
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-});
+// Initialize SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY as string);
 
 // Middleware to parse incoming JSON requests
 app.use(express.json());
@@ -184,11 +178,11 @@ app.post("/auth/forgot-password", async (req, res): Promise<any> => {
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     const resetLink = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
 
-    // Send the email using Nodemailer & Gmail
+    // Send via HTTP (SendGrid)
     try {
-      await transporter.sendMail({
-        from: `"Flashcard AI" <${process.env.GMAIL_USER}>`,
-        to: email,
+      await sgMail.send({
+        to: email, // The user requesting the reset
+        from: process.env.GMAIL_USER as string, // MUST be the exact email you verified in SendGrid
         subject: "Reset Your Password - Flashcard AI",
         html: `
           <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto;">
@@ -203,9 +197,13 @@ app.post("/auth/forgot-password", async (req, res): Promise<any> => {
           </div>
         `,
       });
-      console.log(`Reset email sent successfully to ${email}`);
-    } catch (emailError) {
-      console.error("Nodemailer failed to send:", emailError);
+      console.log(`Reset email sent successfully to ${email} via SendGrid`);
+    } catch (emailError: any) {
+      // Log the specific SendGrid error for debugging, but don't crash the route
+      console.error(
+        "SendGrid failed to send:",
+        emailError.response?.body || emailError,
+      );
     }
 
     res.status(200).json({
